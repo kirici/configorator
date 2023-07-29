@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"unicode"
@@ -28,7 +29,8 @@ func handleReq(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		configType := evalConfig(r)
-		writeJSON(configType)
+		writeJSON(configType, "profile-config.json")
+		execPipeline("cat", "profile-config.json")
 		http.ServeFile(w, r, "submit.html")
 		return
 	}
@@ -48,7 +50,7 @@ func evalConfig(r *http.Request) model.Profile {
 				subField := field.Field(j)
 				subFieldType := subField.Type()
 				subFieldName := field.Type().Field(j).Name
-				// TODO: validate parsed values
+				// TODO: validate parsed values match subFieldType
 				switch subFieldType.Kind() {
 				case reflect.String:
 					subFieldValue := r.FormValue(subFieldName)
@@ -66,12 +68,12 @@ func evalConfig(r *http.Request) model.Profile {
 	return profile
 }
 
-func writeJSON(profile model.Profile) {
+func writeJSON(profile model.Profile, filename string) {
 	jsonData, err := json.MarshalIndent(profile, "", " ")
 	if err != nil {
 		fmt.Printf("ERROR: %s", err)
 	}
-	f, err := os.Create("profile-config.json")
+	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("ERROR: %s", err)
 	}
@@ -95,10 +97,8 @@ func tmplParse() *template.Template {
 }
 
 // TODO: implementation
-
 // func genHTML(t reflect.Kind) {
 // 	var tmpl, key string
-
 // 	switch t {
 // 	case reflect.Bool:
 // 		tmpl = `<label>` + key + `:</label>
@@ -113,13 +113,16 @@ func tmplParse() *template.Template {
 // 		return
 // 	}
 // 	var result bytes.Buffer
-// 	err := template.Must(template.New("field").Parse(tmpl)).Execute(&result, field)
-// 	if err != nil {
-// 		fmt.Printf("ERROR: %s", err)
-// 	}
-// 	tmpl = template.HTML(result.String())
 // 	return
 // }
+
+func execPipeline(launcher string, config string) {
+	out, err := exec.Command(launcher, config).Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%s\n", out)
+}
 
 func firstToLower(s string) string {
 	r, size := utf8.DecodeRuneInString(s)
