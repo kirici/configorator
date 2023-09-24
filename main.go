@@ -16,10 +16,12 @@ import (
 )
 
 func main() {
+	port := ":8080"
 	http.HandleFunc("/", handleReq)
 	fs := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
-	http.ListenAndServe(":8080", nil)
+	fmt.Println("Starting server at", port)
+	http.ListenAndServe(port, nil)
 }
 
 func handleReq(w http.ResponseWriter, r *http.Request) {
