@@ -30,8 +30,8 @@ func handleReq(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		configType := evalConfig(r)
-		writeJSON(configType, "profile-config.json")
+		setConfigTypes := evalConfig(r)
+		writeJSON(setConfigTypes, "profile-config.json")
 		execPipeline("cat", "profile-config.json")
 		http.ServeFile(w, r, "submit.html")
 		return
@@ -86,37 +86,13 @@ func writeJSON(profile model.Profile, filename string) {
 }
 
 func tmplParse() *template.Template {
-	tmpl, err := template.New("base.html").Funcs(template.FuncMap{
-		"IsString": checkString,
-		"IsInt":    checkInt,
-		"IsBool":   checkBool,
-	}).ParseFiles("base.html")
+	tmpl, err := template.New("base.html").ParseFiles("base.html")
 	if err != nil {
 		fmt.Printf("ERROR: %s", err)
 		panic(err)
 	}
 	return tmpl
 }
-
-// TODO: implementation
-// func genHTML(t reflect.Kind) {
-// 	var tmpl, key string
-// 	switch t {
-// 	case reflect.Bool:
-// 		tmpl = `<label>` + key + `:</label>
-// 				<input type="checkbox" id="` + key + `" name="` + key + `" /><br />`
-// 	case reflect.String:
-// 		tmpl = `<label>` + key + `:</label>
-// 				<input type="text" id="` + key + `" name="` + key + `" /><br />`
-// 	case reflect.Int:
-// 		tmpl = `<label>` + key + `:</label>
-// 				<input type="number" id="` + key + `" name="` + key + `" /><br />`
-// 	default:
-// 		return
-// 	}
-// 	var result bytes.Buffer
-// 	return
-// }
 
 func execPipeline(launcher string, config string) {
 	out, err := exec.Command(launcher, config).Output()
@@ -136,20 +112,4 @@ func firstToLower(s string) string {
 		return s
 	}
 	return string(lc) + s[size:]
-}
-
-// Likely to be deprecated together with FuncMap if custom generator instead of html/template
-func checkString(i interface{}) bool {
-	_, ok := i.(string)
-	return ok
-}
-
-func checkInt(i interface{}) bool {
-	_, ok := i.(int)
-	return ok
-}
-
-func checkBool(i interface{}) bool {
-	_, ok := i.(bool)
-	return ok
 }
