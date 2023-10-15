@@ -82,7 +82,6 @@ func writeJSON(profile model.Profile, filename string) {
 	defer f.Close()
 
 	f.Write(jsonData)
-	f.Close()
 }
 
 func tmplParse() *template.Template {
