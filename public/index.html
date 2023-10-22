@@ -1,0 +1,22 @@
+<h1>confiGorator!</h1>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>confiGorator!</title>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<form action="/submit" method="POST">
+    <div class="css-input">
+        <label>allow workloads on master nodes:</label>
+        <input type=checkbox checked name=allowWorkloadsOnMaster value="true" /><br />
+
+        <label>GlusterFS disk size:</label>
+        <input type="number" name="GlusterFSDiskSize"><br />
+
+        <label>base domain:</label>
+        <input type="text" name="baseDomain"><br />
+
+        <input type="submit">
+    </div>
+</form>

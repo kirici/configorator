@@ -1,77 +1,59 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
+	"io/fs"
+	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"reflect"
-	"strconv"
-	"unicode"
-	"unicode/utf8"
 
-	"github.com/kirici/configorator/model"
+	"github.com/kirici/configorator/form"
 )
 
+//go:embed public
+var emPub embed.FS
+
 func main() {
-	port := ":8080"
-	http.HandleFunc("/", handleReq)
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	port := os.Getenv("CONFIGOPORT") // TODO: move to cmd (CLI)
+	if port == "" {
+		port = "36525"
+	}
+	port = ":" + port
+	fs := *newServer()
+	// go getBin(url) and writeBin(name)
+
+	http.Handle("/", fs)
+	http.HandleFunc("/submit", handleForm)
+	// TODO when go 1.22: http.HandleFunc("POST /submit", handleForm)
+
 	fmt.Println("Starting server at", port)
-	http.ListenAndServe(port, nil)
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func handleReq(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		setConfigTypes := evalConfig(r)
-		writeJSON(setConfigTypes, "profile-config.json")
-		execPipeline("cat", "profile-config.json")
-		http.ServeFile(w, r, "submit.html")
-		return
+func newServer() *http.Handler {
+	staticFS := fs.FS(emPub)
+	fsPublic, err := fs.Sub(staticFS, "public")
+	if err != nil {
+		log.Fatal(err)
 	}
-	tmpl := tmplParse()
-	tmpl.Execute(w, nil)
+	fs := http.FileServer(http.FS(fsPublic))
+	return &fs
 }
 
-// TODO: Try and avoid reflection using maps and interfaces
-func evalConfig(r *http.Request) model.Profile {
-	profile := model.Profile{}
-	profileValue := reflect.ValueOf(&profile).Elem()
-	for i := 0; i < profileValue.NumField(); i++ {
-		field := profileValue.Field(i)
-		fieldType := field.Type()
-		if fieldType.Kind() == reflect.Struct {
-			for j := 0; j < field.NumField(); j++ {
-				subField := field.Field(j)
-				subFieldType := subField.Type()
-				subFieldName := field.Type().Field(j).Name
-				// TODO: validate parsed values match subFieldType
-				switch subFieldType.Kind() {
-				case reflect.String:
-					subFieldValue := r.FormValue(subFieldName)
-					subField.SetString(subFieldValue)
-				case reflect.Int64:
-					subFieldValue, _ := strconv.ParseInt(r.FormValue(subFieldName), 10, 64)
-					subField.SetInt(subFieldValue)
-				case reflect.Bool:
-					exists := r.Form.Has(firstToLower(subFieldName))
-					subField.SetBool(exists)
-				}
-			}
-		}
-	}
-	return profile
+func handleForm(w http.ResponseWriter, r *http.Request) {
+	formValues := form.ParseValues(r)
+	writeJSON(formValues, "profile-config.json")
+
+	submitPage, _ := emPub.ReadFile("public/submit.html")
+	w.Write(submitPage)
+
+	// execPipeline("./bin", "--help")
 }
 
-func writeJSON(profile model.Profile, filename string) {
-	jsonData, err := json.MarshalIndent(profile, "", " ")
+func writeJSON(c *form.Profile, filename string) {
+	jsonData, err := json.MarshalIndent(c, "", " ")
 	if err != nil {
 		fmt.Printf("ERROR: %s", err)
 	}
@@ -82,33 +64,4 @@ func writeJSON(profile model.Profile, filename string) {
 	defer f.Close()
 
 	f.Write(jsonData)
-}
-
-func tmplParse() *template.Template {
-	tmpl, err := template.New("base.html").ParseFiles("base.html")
-	if err != nil {
-		fmt.Printf("ERROR: %s", err)
-		panic(err)
-	}
-	return tmpl
-}
-
-func execPipeline(launcher string, config string) {
-	out, err := exec.Command(launcher, config).Output()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%s\n", out)
-}
-
-func firstToLower(s string) string {
-	r, size := utf8.DecodeRuneInString(s)
-	if r == utf8.RuneError && size <= 1 {
-		return s
-	}
-	lc := unicode.ToLower(r)
-	if r == lc {
-		return s
-	}
-	return string(lc) + s[size:]
 }
