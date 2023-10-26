@@ -16,12 +16,12 @@ import (
 var emPub embed.FS
 
 func main() {
-	port := os.Getenv("CONFIGOPORT") // TODO: move to cmd (CLI)
+	port := os.Getenv("CONFIGOPORT") // TODO: move to cmd package
 	if port == "" {
 		port = "36525"
 	}
 	port = ":" + port
-	fs := *newServer()
+	fs := *newServerFS()
 	// go getBin(url) and writeBin(name)
 
 	http.Handle("/", fs)
@@ -32,7 +32,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
-func newServer() *http.Handler {
+func newServerFS() *http.Handler {
 	staticFS := fs.FS(emPub)
 	fsPublic, err := fs.Sub(staticFS, "public")
 	if err != nil {
