@@ -16,11 +16,8 @@ import (
 var emPub embed.FS
 
 func main() {
-	port := os.Getenv("CONFIGOPORT") // TODO: move to cmd package
-	if port == "" {
-		port = "36525"
-	}
-	port = ":" + port
+	port := configPort()
+
 	fs := *newServerFS()
 	// go getBin(url) and writeBin(name)
 
@@ -30,6 +27,15 @@ func main() {
 
 	fmt.Println("Starting server at", port)
 	log.Fatal(http.ListenAndServe(port, nil))
+}
+
+func configPort() (port string) {
+	os.Getenv("CONFIGOPORT")
+	if port == "" {
+		port = "8080"
+	}
+	port = ":" + port
+	return port
 }
 
 func newServerFS() *http.Handler {
