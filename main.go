@@ -19,11 +19,11 @@ func main() {
 	port := configPort()
 
 	fs := *newServerFS()
-	// go getBin(url) and writeBin(name)
+	// TODO: go getBin(url) and writeBin(name)
 
 	http.Handle("/", fs)
 	http.HandleFunc("/submit", handleForm)
-	// TODO when go 1.22: http.HandleFunc("POST /submit", handleForm)
+	// TODO: when go 1.22 hits use "POST /submit"
 
 	fmt.Println("Starting server at", port)
 	log.Fatal(http.ListenAndServe(port, nil))
