@@ -13,7 +13,6 @@ func ParseValues(r *http.Request) *Profile {
 	p := &Profile{}
 	p.Config.AllowWorkloadsOnMaster, _ = strconv.ParseBool(r.FormValue("allowWorkloadsOnMaster"))
 	p.Config.BaseDomain = r.FormValue("baseDomain")
-	p.Config.GlusterFsDiskSize, _ = strconv.ParseInt(r.FormValue("GlusterFSDiskSize"), 10, 64)
 	p.Config.BaseIPType = r.FormValue("baseIpType")
 	p.Config.BasePassword = r.FormValue("basePassword")
 	p.Config.BaseUser = r.FormValue("baseUser")
@@ -25,6 +24,7 @@ func ParseValues(r *http.Request) *Profile {
 	p.Config.Docker.DockerhubEmail = r.FormValue("dockerhub_email")
 	p.Config.Docker.DockerhubPassword = r.FormValue("dockerhub_password")
 	p.Config.Docker.DockerhubUsername = r.FormValue("dockerhub_username")
+	p.Config.GlusterFsDiskSize, _ = strconv.ParseInt(r.FormValue("GlusterFSDiskSize"), 10, 64)
 	p.Config.LocalVolumes.FiftyGB, _ = strconv.ParseInt(r.FormValue("fifty_gb"), 10, 64)
 	p.Config.LocalVolumes.FiveGB, _ = strconv.ParseInt(r.FormValue("five_gb"), 10, 64)
 	p.Config.LocalVolumes.OneGB, _ = strconv.ParseInt(r.FormValue("one_gb"), 10, 64)
