@@ -5,9 +5,7 @@
     <div class="container mx-auto mt-8">
         <h1 class="text-4xl font-bold mb-4">Welcome to confiGo!</h1>
         <p class="text-lg">Lorem ipsum dolor sit amet.</p>
-        <!-- Form with HTMX attributes -->
-        <form action="/submit" method="post" hx-post="/submit" hx-trigger="submit" hx-target="#result">
-            <!-- Your form fields go here -->
+        <form hx-post="/submit" hx-trigger="submit" hx-target="#result">
             <table>
                 {{ range $key, $value := . }}
                 <tr>
