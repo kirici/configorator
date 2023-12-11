@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"text/template"
 
@@ -19,6 +20,7 @@ var content embed.FS
 
 func main() {
 	trapSIGTERM()
+	profile := flatten(mapJSON("profile-config.json"))
 
 	// Parse templates during server startup
 	indexTemplate, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
@@ -33,10 +35,9 @@ func main() {
 
 	// Requests to "/"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		pageFields := model.Profile{} // TODO: Range over Profile to template fields
-		err := indexTemplate.Execute(w, pageFields)
+		err := indexTemplate.Execute(w, profile)
 		if err != nil {
-			fmt.Printf("ERROR: Template error: %s", err)
+			fmt.Printf("ERROR: Templates: %s", err)
 			return
 		}
 	})
@@ -58,7 +59,7 @@ func main() {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		writeJSON(config, "profile-config.json")
+		writeJSON(config, "profile-config-output.json")
 	})
 
 	// Start the server
@@ -75,6 +76,36 @@ func trapSIGTERM() {
 		fmt.Println("Received SIGTERM, exiting.")
 		os.Exit(1)
 	}()
+}
+
+func mapJSON(f string) map[string]interface{} {
+	c, err := os.ReadFile(f)
+	if err != nil {
+		fmt.Printf("ERROR: Could not read file: %s", err)
+	}
+	result := make(map[string]interface{})
+	json.Unmarshal([]byte(c), &result)
+	return result
+}
+
+func flatten(m map[string]interface{}) map[string]interface{} {
+	o := map[string]interface{}{}
+	for k, v := range m {
+		switch child := v.(type) {
+		case map[string]interface{}:
+			nm := flatten(child)
+			for nk, nv := range nm {
+				o[k+"."+nk] = nv
+			}
+		case []interface{}:
+			for i := 0; i < len(child); i++ {
+				o[k+"."+strconv.Itoa(i)] = child[i]
+			}
+		default:
+			o[k] = v
+		}
+	}
+	return o
 }
 
 func writeJSON(input any, filename string) {
