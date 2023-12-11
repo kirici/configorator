@@ -21,12 +21,12 @@ func main() {
 	trapSIGTERM()
 
 	// Parse templates during server startup
-	indexTemplate, err := template.ParseFS(content, "templates/index.html")
+	indexTemplate, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
 	if err != nil {
 		panic(err)
 	}
 
-	submitTemplate, err := template.ParseFS(content, "templates/submit.html")
+	submitTemplate, err := template.ParseFS(content, "templates/submit.html", "templates/header.html")
 	if err != nil {
 		panic(err)
 	}
