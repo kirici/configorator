@@ -4,74 +4,88 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"text/template"
 
-	"github.com/kirici/configorator/form"
+	"github.com/kirici/configorator/model"
 )
 
-//go:embed public
-var emPub embed.FS
+//go:embed templates/*
+var content embed.FS
 
 func main() {
-	port := configPort()
+	trapSIGTERM()
 
-	fs := *newServerFS()
-	// TODO: go getBin(url) and writeBin(name)
+	// Parse templates during server startup
+	indexTemplate, err := template.ParseFS(content, "templates/index.html")
+	if err != nil {
+		panic(err)
+	}
 
-	http.Handle("/", fs)
-	http.HandleFunc("/submit", handleForm)
-	// TODO: when go 1.22 hits use "POST /submit"
+	submitTemplate, err := template.ParseFS(content, "templates/submit.html")
+	if err != nil {
+		panic(err)
+	}
 
+	// Requests to "/"
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		pageFields := model.Profile{} // TODO: Range over Profile to template fields
+		err := indexTemplate.Execute(w, pageFields)
+		if err != nil {
+			fmt.Printf("ERROR: Template error: %s", err)
+			return
+		}
+	})
+
+	// POST "/submit"
+	http.HandleFunc("/submit", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		err := submitTemplate.Execute(w, nil)
+		if err != nil {
+			fmt.Printf("ERROR: Template error: %s", err)
+			return
+		}
+		// Retrieve form data
+		config := *model.ParseValues(r)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		writeJSON(config, "profile-config.json")
+	})
+
+	// Start the server
+	port := "8080"
 	fmt.Println("Starting server at", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-func configPort() (port string) {
-	os.Getenv("CONFIGOPORT")
-	if port == "" {
-		port = "8080"
-	}
-	port = ":" + port
-	return port
+func trapSIGTERM() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("Received SIGTERM, exiting.")
+		os.Exit(1)
+	}()
 }
 
-func newServerFS() *http.Handler {
-	staticFS := fs.FS(emPub)
-	fsPublic, err := fs.Sub(staticFS, "public")
+func writeJSON(input any, filename string) {
+	jsonData, err := json.MarshalIndent(input, "", "  ")
 	if err != nil {
-		log.Fatal(err)
-	}
-	fs := http.FileServer(http.FS(fsPublic))
-	return &fs
-}
-
-func handleForm(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	formValues := form.ParseValues(r)
-	writeJSON(formValues, "profile-config.json")
-
-	submitPage, _ := emPub.ReadFile("public/submit.html")
-	w.Write(submitPage)
-
-	// execPipeline("./bin", "--help")
-}
-
-func writeJSON(c *form.Profile, filename string) {
-	jsonData, err := json.MarshalIndent(c, "", " ")
-	if err != nil {
-		fmt.Printf("ERROR: %s", err)
+		fmt.Printf("ERROR: Could not marshal JSON: %s", err)
 	}
 	f, err := os.Create(filename)
 	if err != nil {
-		fmt.Printf("ERROR: %s", err)
+		fmt.Printf("ERROR: Could not create file: %s", err)
 	}
 	defer f.Close()
-
 	f.Write(jsonData)
 }

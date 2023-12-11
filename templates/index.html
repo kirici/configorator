@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>confiGo</title>
+    <!-- Include Tailwind CSS styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include HTMX script tags -->
+    <script src="https://unpkg.com/htmx.org@1.7.0/dist/htmx.js"></script>
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto mt-8">
+        <h1 class="text-4xl font-bold mb-4">Welcome to confiGo!</h1>
+        <p class="text-lg">Lorem ipsum dolor sit amet.</p>
+        <!-- Form with HTMX attributes -->
+        <form action="/submit" method="post" hx-post="/submit" hx-trigger="submit" hx-target="#result">
+            <!-- Your form fields go here -->
+            <input type="text" name="baseDomain" placeholder="kxac.local" required>
+            <button type="submit" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
+        </form>
+        <!-- Display validation result here -->
+        <div id="result" class="mt-4 text-green-500"></div>
+    </div>
+</body>
+
+</html>
