@@ -8,7 +8,17 @@
         <!-- Form with HTMX attributes -->
         <form action="/submit" method="post" hx-post="/submit" hx-trigger="submit" hx-target="#result">
             <!-- Your form fields go here -->
-            <input type="text" name="baseDomain" placeholder="kxac.local" required>
+            <table>
+                {{ range $key, $value := . }}
+                <tr>
+                    <td><label class="block mb-2 text-base font-medium text-gray-900 dark:text-grey">{{ $key}}:</label>
+                    </td>
+                    <td><input type="text" name="{{ $key }}"
+                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                            placeholder="{{ $value }}" required></td>
+                </tr>
+                {{ end }}
+            </table>
             <button type="submit" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Submit</button>
         </form>
         <!-- Display validation result here -->
