@@ -17,6 +17,7 @@ import (
 	"text/template"
 
 	"github.com/kirici/configorator/model"
+	"github.com/pkg/browser"
 )
 
 //go:embed templates/*
@@ -69,6 +70,7 @@ func main() {
 	// Start the server
 	port := "8080"
 	fmt.Println("Starting server at", port)
+	browser.OpenURL("http://127.0.0.1:" + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
