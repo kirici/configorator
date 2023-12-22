@@ -15,6 +15,11 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <tr>
+                            <td><label class="font-mono text-base">Example Variable:</label></td>
+                            <td><input type="text" name="someVar" class="font-mono input w-full max-w-xs"
+                                    placeholder="Example Value" required></td>
+                        </tr>
                         {{ range $key, $value := . }}
                         <tr>
                             <td><label class="font-mono text-base">{{ $key}}:</label></td>

@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
-	"strconv"
 	"syscall"
 	"text/template"
 
@@ -26,7 +25,6 @@ var content embed.FS
 func main() {
 	trapSIGTERM()
 	go fetch()
-	profile := flatten(mapFile("profile-config.json"))
 
 	// Parse templates during server startup
 	indexTemplate, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
@@ -41,7 +39,7 @@ func main() {
 
 	// Requests to "/"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := indexTemplate.Execute(w, profile)
+		err := indexTemplate.Execute(w, nil)
 		if err != nil {
 			log.Fatalf("ERROR: Templates: %s", err)
 		}
@@ -82,36 +80,6 @@ func trapSIGTERM() {
 		fmt.Println("Received SIGTERM, exiting.")
 		os.Exit(1)
 	}()
-}
-
-func mapFile(f string) map[string]interface{} {
-	c, err := os.ReadFile(f)
-	if err != nil {
-		log.Fatalf("ERROR: Could not read file: %s", err)
-	}
-	result := make(map[string]interface{})
-	json.Unmarshal((c), &result)
-	return result
-}
-
-func flatten(m map[string]interface{}) map[string]interface{} {
-	o := map[string]interface{}{}
-	for k, v := range m {
-		switch child := v.(type) {
-		case map[string]interface{}:
-			nm := flatten(child)
-			for nk, nv := range nm {
-				o[k+"."+nk] = nv
-			}
-		case []interface{}:
-			for i := 0; i < len(child); i++ {
-				o[k+"."+strconv.Itoa(i)] = child[i]
-			}
-		default:
-			o[k] = v
-		}
-	}
-	return o
 }
 
 func writeJSON(input any, filename string) {
