@@ -1,0 +1,2 @@
+skip-check:
+  - CKV_DOCKER_2 # HEALTHCHECK is not supported by OCI format - should be handled at orchestration level
