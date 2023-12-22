@@ -25,16 +25,16 @@ FROM alpine:3.18
 
 RUN apk update \
   && apk -U upgrade \
-  && apk add --no-cache ca-certificates bash gcc \
+  && apk add --no-cache ca-certificates=20230506-r0 \
   && update-ca-certificates --fresh \
   && rm -rf /var/cache/apk/*
 
 RUN addgroup runner_group && adduser -S runner -u 1000 -G runner_group
 
-WORKDIR /src
+COPY --from=BUILD /src/out/app /src/
 
-COPY --chown=runner:runner_group --from=BUILD /src/out/app /src/app
+RUN chmod +x /src/app
 
-RUN chmod +x app
+USER runner
 
 ENTRYPOINT ["/src/app"]
