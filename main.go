@@ -133,12 +133,14 @@ func fetch() {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("ERROR: Could not download packer; %s", err)
+		return
 	}
 	defer resp.Body.Close()
 	f := "packer.zip"
 	out, err := os.Create(f)
 	if err != nil {
 		log.Printf("ERROR: Could not create file; %s", err)
+		return
 	}
 	defer out.Close()
 	io.Copy(out, resp.Body)
@@ -147,7 +149,11 @@ func fetch() {
 
 func unzip(name string) {
 	f := "packer.zip"
-	reader, _ := zip.OpenReader(f)
+	reader, err := zip.OpenReader(f)
+	if err != nil {
+		log.Printf("ERROR: Could not open zip file; %s", err)
+		return
+	}
 	defer reader.Close()
 	for _, file := range reader.File {
 		in, _ := file.Open()
