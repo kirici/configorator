@@ -90,7 +90,7 @@ func mapFile(f string) map[string]interface{} {
 		log.Fatalf("ERROR: Could not read file: %s", err)
 	}
 	result := make(map[string]interface{})
-	json.Unmarshal([]byte(c), &result)
+	json.Unmarshal((c), &result)
 	return result
 }
 
