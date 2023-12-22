@@ -1,10 +1,27 @@
 rules:
-  quoted-strings:
-    required: only-when-needed
-    extra-allowed: ["{|}"]
+  braces: enable
+  brackets: enable
+  colons: enable
+  commas: enable
+  comments-indentation:
+    level: warning
+  document-end: disable
   empty-values:
     forbid-in-block-mappings: true
     forbid-in-flow-mappings: true
+  empty-lines: enable
+  hyphens: enable
+  indentation:
+    spaces: consistent
+    indent-sequences: consistent
   key-duplicates: {}
+  key-ordering: disable
   octal-values:
     forbid-implicit-octal: true
+  line-length:
+    max: 160
+    level: warning
+  new-line-at-end-of-file: enable
+  new-lines: enable
+  quoted-strings: disable
+  trailing-spaces: enable
