@@ -19,6 +19,3 @@ go.work
 
 # IDEs
 .vscode/
-
-# Temporary files
-profile-config*.json
