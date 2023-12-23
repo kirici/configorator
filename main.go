@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/kirici/configorator/model"
 	"github.com/kirici/configorator/packer"
 	"github.com/pkg/browser"
 )
@@ -52,13 +50,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("ERROR: Template error: %s", err)
 		}
-		// Retrieve form data
-		config := *model.ParseValues(r)
-		if err != nil {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			return
-		}
-		writeJSON(config, "profile-config-output.json")
 		go packer.Exec(c)
 	})
 
@@ -80,18 +71,19 @@ func trapSIGTERM() chan os.Signal {
 	return c
 }
 
-func writeJSON(input any, filename string) {
-	jsonData, err := json.MarshalIndent(input, "", "  ")
-	if err != nil {
-		fmt.Printf("ERROR: Could not marshal JSON: %s", err)
-	}
-	f, err := os.Create(filename)
-	if err != nil {
-		fmt.Printf("ERROR: Could not create file: %s", err)
-	}
-	defer f.Close()
-	f.Write(jsonData)
-}
+// writeJSON is slated for removal
+// func writeJSON(input any, filename string) {
+// 	jsonData, err := json.MarshalIndent(input, "", "  ")
+// 	if err != nil {
+// 		fmt.Printf("ERROR: Could not marshal JSON: %s", err)
+// 	}
+// 	f, err := os.Create(filename)
+// 	if err != nil {
+// 		fmt.Printf("ERROR: Could not create file: %s", err)
+// 	}
+// 	defer f.Close()
+// 	f.Write(jsonData)
+// }
 
 // C:\projects\kx.as.code\base-vm\build\jenkins\jenkins_home\tools\biz.neustar.jenkins.plugins.packer.PackerInstallation\packer-windows\packer.exe build -force -on-error=abort -only kx-main-virtualbox -var compute_engine_build=false -var memory=8192 -var cpus=2 -var video_memory=128 -var hostname=kx-main -var domain=kx-as-code.local -var version=0.8.16 -var kube_version=1.27.4-00 -var vm_user=kx.hero -var vm_password=L3arnandshare -var git_source_url=https://github.com/Accenture/kx.as.code.git -var git_source_branch=main -var git_source_user= -var git_source_token= -var base_image_ssh_user=vagrant ./kx-main-local-profiles.json
 // unwrap>
