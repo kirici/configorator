@@ -11,6 +11,7 @@ import (
 )
 
 func Fetch() {
+	log.Printf("Downloading Packer.")
 	url := "https://releases.hashicorp.com/packer/1.10.0/packer_1.10.0_windows_amd64.zip"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -30,6 +31,7 @@ func Fetch() {
 }
 
 func unzip(name string) {
+	log.Printf("Unpacking Packer.")
 	f := "packer.zip"
 	reader, err := zip.OpenReader(f)
 	if err != nil {
