@@ -18,7 +18,8 @@ import (
 var content embed.FS
 
 func main() {
-	c := trapSIGTERM()
+	// Channel will be used to propagate OS interrupts to child procs
+	var c chan os.Signal = trapSIGTERM()
 	go packer.Fetch()
 
 	// Parse templates during server startup
