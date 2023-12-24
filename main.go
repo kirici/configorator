@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,7 +20,7 @@ var content embed.FS
 func main() {
 	f, err := os.OpenFile("configo.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
 	if err != nil {
-		slog.Error("Could not open log file: %s", "error", err)
+		slog.Error("Could not open log file", "err", err)
 	}
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f), nil))
 	slog.SetDefault(logger)
@@ -33,11 +32,13 @@ func main() {
 	// Parse templates during server startup
 	indexTpl, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
 	if err != nil {
-		log.Fatalf("Could not parse template: %s", err)
+		slog.Error("Could not parse template", "err", err)
+		os.Exit(1)
 	}
 	submitTpl, err := template.ParseFS(content, "templates/submit.html", "templates/header.html")
 	if err != nil {
-		log.Fatalf("Could not parse template: %s", err)
+		slog.Error("Could not parse template", "err", err)
+		os.Exit(1)
 	}
 
 	// Requests to "/"
@@ -47,13 +48,16 @@ func main() {
 
 	// Start the server
 	port := "8080"
-	log.Println("Starting server at", port)
+	slog.Info("Starting server at http://127.0.0.1:" + port)
 	browser.Stdout, browser.Stderr = io.Discard, io.Discard
 	err = browser.OpenURL("http://127.0.0.1:" + port)
 	if err != nil {
-		slog.Error("Could not open browser: %s.", "error", err)
+		slog.Error("Could not open browser", "err", err)
 	}
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		slog.Error("Could not start server", "err", err)
+		os.Exit(1)
+	}
 }
 
 // Indirection of returning an http Handler to enable passing parameters
@@ -61,7 +65,7 @@ func serveIndex(tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := tpl.Execute(w, nil)
 		if err != nil {
-			log.Fatalf("ERROR: Template error: %s", err)
+			slog.Error("Templating error", "err", err)
 		}
 	}
 }
@@ -75,12 +79,12 @@ func submitHandler(tpl *template.Template, c chan os.Signal) http.HandlerFunc {
 		}
 		err := tpl.Execute(w, nil)
 		if err != nil {
-			log.Fatalf("ERROR: Template error: %s", err)
+			slog.Error("Templating error", "err", err)
 		}
 		slog.Info("Launching Packer.")
 		err = packer.Exec(c)
 		if err != nil {
-			slog.Error("Packer failed to launch.", "error", err)
+			slog.Error("Packer failed to launch.", "err", err)
 		}
 	}
 }

@@ -15,7 +15,7 @@ import (
 
 func simpleCheck(err error) {
 	if err != nil {
-		slog.Error("ERROR: %s", err)
+		slog.Error("Error:", "err", err)
 		return
 	}
 }
