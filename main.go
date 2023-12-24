@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"text/template"
 
+	"github.com/cli/browser"
 	"github.com/kirici/configorator/packer"
-	"github.com/pkg/browser"
 )
 
 //go:embed templates/*
@@ -40,8 +40,7 @@ func main() {
 
 	// Start the server
 	port := "8080"
-	fmt.Println("Starting server at", port)
-	browser.OpenURL("http://127.0.0.1:" + port)
+	browser.Stdout, browser.Stderr = io.Discard, io.Discard
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
