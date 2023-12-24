@@ -21,7 +21,7 @@ var content embed.FS
 func main() {
 	f, err := os.OpenFile("configo.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
 	if err != nil {
-		slog.Error("Could not open log file: %s", err)
+		slog.Error("Could not open log file: %s", "error", err)
 	}
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f), nil))
 	slog.SetDefault(logger)
@@ -51,7 +51,7 @@ func main() {
 	browser.Stdout, browser.Stderr = io.Discard, io.Discard
 	err = browser.OpenURL("http://127.0.0.1:" + port)
 	if err != nil {
-		slog.Error("Could not open browser: %s. Please visit http://127.0.0.1:%s", err, port)
+		slog.Error("Could not open browser: %s.", "error", err)
 	}
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
@@ -77,7 +77,11 @@ func submitHandler(tpl *template.Template, c chan os.Signal) http.HandlerFunc {
 		if err != nil {
 			log.Fatalf("ERROR: Template error: %s", err)
 		}
-		go packer.Exec(c)
+		slog.Info("Launching Packer.")
+		err = packer.Exec(c)
+		if err != nil {
+			slog.Error("Packer failed to launch.", "error", err)
+		}
 	}
 }
 
