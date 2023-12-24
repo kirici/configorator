@@ -1,12 +1,16 @@
 package main
 
 import (
+	"archive/zip"
 	"embed"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path"
 	"syscall"
 	"text/template"
 
@@ -26,8 +30,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Channel will be used to propagate OS interrupts to child procs
-	var c chan os.Signal = trapSIGTERM()
-	go packer.Fetch()
+	var c chan os.Signal = trapInterrupt()
+	// Could be replaced by runtime checks
+	url, bin := packer.PlatformVars()
+	go fetch(url)
 
 	// Parse templates during server startup
 	indexTpl, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
@@ -44,7 +50,7 @@ func main() {
 	// Requests to "/"
 	http.HandleFunc("/", serveIndex(indexTpl))
 	// POST "/submit"
-	http.HandleFunc("/submit", submitHandler(submitTpl, c))
+	http.HandleFunc("/submit", submitHandler(submitTpl, c, bin))
 
 	// Start the server
 	port := "8080"
@@ -71,7 +77,7 @@ func serveIndex(tpl *template.Template) http.HandlerFunc {
 }
 
 // submitHandler validates the request method and passes the sigterm channel parameter on to the child proc
-func submitHandler(tpl *template.Template, c chan os.Signal) http.HandlerFunc {
+func submitHandler(tpl *template.Template, sigint chan os.Signal, bin string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -82,20 +88,91 @@ func submitHandler(tpl *template.Template, c chan os.Signal) http.HandlerFunc {
 			slog.Error("Templating error", "err", err)
 		}
 		slog.Info("Launching Packer.")
-		err = packer.Exec(c)
+		err = execPacker(sigint, bin)
 		if err != nil {
 			slog.Error("Packer failed to launch.", "err", err)
 		}
 	}
 }
 
-func trapSIGTERM() chan os.Signal {
+func trapInterrupt() chan os.Signal {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		slog.Info("Received SIGTERM, exiting.")
+		slog.Info("Received interrupt, exiting.")
 		os.Exit(1)
 	}()
 	return c
+}
+
+func fetch(url string) {
+	slog.Info("Downloading Packer.")
+	const file = "packer.zip"
+
+	resp, err := http.Get(url)
+	simpleCheck(err)
+	defer resp.Body.Close()
+
+	out, err := os.Create(file)
+	simpleCheck(err)
+	defer out.Close()
+
+	io.Copy(out, resp.Body)
+	unzip(file, "tools")
+}
+
+func unzip(file string, out string) {
+	slog.Info("Unpacking Packer.")
+	reader, err := zip.OpenReader(file)
+	simpleCheck(err)
+	defer reader.Close()
+
+	for _, file := range reader.File {
+		src, err := file.Open()
+		simpleCheck(err)
+		defer src.Close()
+
+		relname := path.Join(out, file.Name)
+		dir := path.Dir(relname)
+		os.MkdirAll(dir, 0o777)
+		dst, err := os.Create(relname)
+		simpleCheck(err)
+		defer dst.Close()
+		io.Copy(dst, src)
+
+		err = os.Chmod(dst.Name(), 0o755)
+		simpleCheck(err)
+	}
+}
+
+func execPacker(sig chan os.Signal, bin string) error {
+	cmd := exec.Command("./tools/"+bin, "build", "-force", "-on-error=abort", "-only", "kx-main-virtualbox", "-var", "compute_engine_build=false", "-var", "memory=8192", "-var", "cpus=2", "-var", "video_memory=128", "-var", "hostname=kx-main", "-var", "domain=kx-as-code.local", "-var", "version=0.8.16", "-var", "kube_version=1.27.4-00", "-var", "vm_user=kx.hero", "-var", "vm_password=L3arnandshare", "-var", "git_source_url=https://github.com/Accenture/kx.as.code.git", "-var", "git_source_branch=main", "-var", "git_source_user=", "-var", "git_source_token=", "-var", "base_image_ssh_user=vagrant", "./kx-main-local-profiles.json")
+	stdout, err := cmd.StdoutPipe()
+	simpleCheck(err)
+	stderr, err := cmd.StderrPipe()
+	simpleCheck(err)
+	err = cmd.Start()
+	if err != nil {
+		return errors.New(err.Error())
+	}
+	// Start() does not wait for the command to complete, this ensures that main doesnt exit before cmd does
+	defer cmd.Wait()
+	childLog, err := os.OpenFile("packer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
+	simpleCheck(err)
+	// copy packer output to terminal and log file
+	go io.Copy(io.MultiWriter(os.Stdout, childLog), stdout)
+	go io.Copy(io.MultiWriter(os.Stderr, childLog), stderr)
+	go func() {
+		<-sig
+		cmd.Process.Signal(os.Interrupt)
+	}()
+	return nil
+}
+
+func simpleCheck(err error) {
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return
+	}
 }
