@@ -2,8 +2,9 @@ package main
 
 import (
 	"embed"
-	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +19,13 @@ import (
 var content embed.FS
 
 func main() {
+	f, err := os.OpenFile("configo.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
+	if err != nil {
+		slog.Error("Could not open log file: %s", err)
+	}
+	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f), nil))
+	slog.SetDefault(logger)
+
 	// Channel will be used to propagate OS interrupts to child procs
 	var c chan os.Signal = trapSIGTERM()
 	go packer.Fetch()
@@ -27,7 +35,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not parse template: %s", err)
 	}
-
 	submitTpl, err := template.ParseFS(content, "templates/submit.html", "templates/header.html")
 	if err != nil {
 		log.Fatalf("Could not parse template: %s", err)
@@ -40,7 +47,12 @@ func main() {
 
 	// Start the server
 	port := "8080"
+	log.Println("Starting server at", port)
 	browser.Stdout, browser.Stderr = io.Discard, io.Discard
+	err = browser.OpenURL("http://127.0.0.1:" + port)
+	if err != nil {
+		slog.Error("Could not open browser: %s. Please visit http://127.0.0.1:%s", err, port)
+	}
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
@@ -74,7 +86,7 @@ func trapSIGTERM() chan os.Signal {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println("Received SIGTERM, exiting.")
+		slog.Info("Received SIGTERM, exiting.")
 		os.Exit(1)
 	}()
 	return c
