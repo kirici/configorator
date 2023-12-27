@@ -29,8 +29,6 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f), nil))
 	slog.SetDefault(logger)
 
-	// Channel will be used to propagate OS interrupts to child procs
-	var c chan os.Signal = trapInterrupt()
 	// Could be replaced by runtime checks
 	url, bin := packer.PlatformVars()
 	go fetch(url)
@@ -50,7 +48,7 @@ func main() {
 	// Requests to "/"
 	http.HandleFunc("/", serveIndex(indexTpl))
 	// POST "/submit"
-	http.HandleFunc("/submit", submitHandler(submitTpl, c, bin))
+	http.HandleFunc("/submit", submitHandler(submitTpl, bin))
 
 	// Start the server
 	port := "8080"
@@ -77,7 +75,7 @@ func serveIndex(tpl *template.Template) http.HandlerFunc {
 }
 
 // submitHandler validates the request method and passes the sigterm channel parameter on to the child proc
-func submitHandler(tpl *template.Template, sigint chan os.Signal, bin string) http.HandlerFunc {
+func submitHandler(tpl *template.Template, bin string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -88,22 +86,11 @@ func submitHandler(tpl *template.Template, sigint chan os.Signal, bin string) ht
 			slog.Error("Templating error", "err", err)
 		}
 		slog.Info("Launching Packer.")
-		err = execPacker(sigint, bin)
+		err = execPacker(bin)
 		if err != nil {
 			slog.Error("Packer failed to launch.", "err", err)
 		}
 	}
-}
-
-func trapInterrupt() chan os.Signal {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		slog.Info("Received interrupt, exiting.")
-		os.Exit(1)
-	}()
-	return c
 }
 
 func fetch(url string) {
@@ -146,7 +133,9 @@ func unzip(file string, out string) {
 	}
 }
 
-func execPacker(sig chan os.Signal, bin string) error {
+func execPacker(bin string) error {
+	sig := make(chan os.Signal, 2) // buffer should be equal to number of signals that can be sent
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	cmd := exec.Command("./tools/"+bin, "build", "-force", "-on-error=abort", "-only", "kx-main-virtualbox", "-var", "compute_engine_build=false", "-var", "memory=8192", "-var", "cpus=2", "-var", "video_memory=128", "-var", "hostname=kx-main", "-var", "domain=kx-as-code.local", "-var", "version=0.8.16", "-var", "kube_version=1.27.4-00", "-var", "vm_user=kx.hero", "-var", "vm_password=L3arnandshare", "-var", "git_source_url=https://github.com/Accenture/kx.as.code.git", "-var", "git_source_branch=main", "-var", "git_source_user=", "-var", "git_source_token=", "-var", "base_image_ssh_user=vagrant", "./kx-main-local-profiles.json")
 	stdout, err := cmd.StdoutPipe()
 	simpleCheck(err)
@@ -156,17 +145,21 @@ func execPacker(sig chan os.Signal, bin string) error {
 	if err != nil {
 		return errors.New(err.Error())
 	}
-	// Start() does not wait for the command to complete, this ensures that main doesnt exit before cmd does
-	defer cmd.Wait()
+	defer cmd.Start()
+	go func() {
+		<-sig
+		slog.Info("Terminating Packer")
+		err := cmd.Process.Signal(os.Interrupt)
+		if err != nil {
+			slog.Error("Could not kill child", "err", err)
+		}
+		os.Exit(127)
+	}()
 	childLog, err := os.OpenFile("packer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
 	simpleCheck(err)
 	// copy packer output to terminal and log file
 	go io.Copy(io.MultiWriter(os.Stdout, childLog), stdout)
 	go io.Copy(io.MultiWriter(os.Stderr, childLog), stderr)
-	go func() {
-		<-sig
-		cmd.Process.Signal(os.Interrupt)
-	}()
 	return nil
 }
 
