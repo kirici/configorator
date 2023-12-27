@@ -149,7 +149,7 @@ func execPacker(bin string) error {
 	go func() {
 		<-sig
 		slog.Info("Terminating Packer")
-		err := cmd.Process.Signal(os.Interrupt)
+		err := cmd.Process.Kill()
 		if err != nil {
 			slog.Error("Could not kill child", "err", err)
 		}
