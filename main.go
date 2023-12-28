@@ -15,7 +15,7 @@ import (
 	"text/template"
 
 	"github.com/cli/browser"
-	"github.com/kirici/configorator/packer"
+	"github.com/kirici/configorator/platform"
 )
 
 //go:embed templates/*
@@ -30,7 +30,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Could be replaced by runtime checks
-	url, bin := packer.PlatformVars()
+	url, bin := platform.Packer()
 	go fetch(url)
 
 	// Parse templates during server startup
@@ -149,10 +149,7 @@ func execPacker(bin string) error {
 	go func() {
 		<-sig
 		slog.Info("Terminating Packer")
-		err := cmd.Process.Kill()
-		if err != nil {
-			slog.Error("Could not kill child", "err", err)
-		}
+		platform.Terminate(cmd)
 		os.Exit(127)
 	}()
 	childLog, err := os.OpenFile("packer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
