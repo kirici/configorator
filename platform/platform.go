@@ -17,8 +17,10 @@ func Packer() (string, string) {
 }
 
 func Terminate(cmd *exec.Cmd) {
-	err := cmd.Process.Signal(os.Interrupt)
-	if err != nil {
-		slog.Error("Could not kill child", "err", err)
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		slog.Error("Could not terminate child", "err", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		slog.Error("Wait failed", "err", err)
 	}
 }
