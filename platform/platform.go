@@ -21,6 +21,6 @@ func Terminate(cmd *exec.Cmd) {
 		slog.Error("Could not terminate child", "err", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		slog.Error("Wait failed", "err", err)
+		slog.Error("Non-zero exit code by Packer command, includes build cancels", "err", err)
 	}
 }
