@@ -30,8 +30,8 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Could be replaced by runtime checks
-	url, bin := platform.Packer()
-	go fetch(url)
+	l, _ := platform.Packer()
+	go fetch(l)
 
 	// Parse templates during server startup
 	indexTpl, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
@@ -48,7 +48,7 @@ func main() {
 	// Requests to "/"
 	http.HandleFunc("/", serveIndex(indexTpl))
 	// POST "/submit"
-	http.HandleFunc("/submit", submitHandler(submitTpl, bin))
+	http.HandleFunc("/submit", submitHandler(submitTpl))
 
 	// Start the server
 	port := "8080"
@@ -75,7 +75,7 @@ func serveIndex(tpl *template.Template) http.HandlerFunc {
 }
 
 // submitHandler validates the request method and passes the sigterm channel parameter on to the child proc
-func submitHandler(tpl *template.Template, bin string) http.HandlerFunc {
+func submitHandler(tpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -86,6 +86,7 @@ func submitHandler(tpl *template.Template, bin string) http.HandlerFunc {
 			slog.Error("Templating error", "err", err)
 		}
 		slog.Info("Launching Packer.")
+		_, bin := platform.Packer()
 		err = execPacker(bin)
 		if err != nil {
 			slog.Error("Packer failed to launch.", "err", err)
