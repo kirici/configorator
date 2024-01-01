@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"embed"
 	"errors"
+	"flag"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,10 +19,23 @@ import (
 	"github.com/kirici/configorator/platform"
 )
 
+var (
+	cleanup    = flag.String("cleanup", "cleanup", "packer's --on-error argument")
+	kxNodeType = flag.String("nodetype", "kx-main-virtualbox", "usage")
+	kxMemory   = flag.String("memory", "4096MB", "usage")
+	kxCPUs     = flag.String("cpus", "2", "amount of cores to be used")
+	kxHostname = flag.String("hostname", "kx-main", "usage")
+	kxDomain   = flag.String("domain", "kx-as-code.local", "usage")
+	kxVersion  = flag.String("version", "0.8.16", "usage")
+	vmUser     = flag.String("vmuser", "kx.hero", "usage")
+	vmPassword = flag.String("vmpassword", "L3earnandshare", "usage")
+)
+
 //go:embed templates/*
 var content embed.FS
 
 func main() {
+	flag.Parse()
 	f, err := os.OpenFile("configo.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
 	if err != nil {
 		slog.Error("Could not open log file", "err", err)
@@ -137,7 +151,7 @@ func unzip(file string, out string) {
 func execPacker(bin string) error {
 	sig := make(chan os.Signal, 2) // buffer should be equal to number of signals that can be sent
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	cmd := exec.Command("./tools/"+bin, "build", "-force", "-on-error=abort", "-only", "kx-main-virtualbox", "-var", "compute_engine_build=false", "-var", "memory=8192", "-var", "cpus=2", "-var", "video_memory=128", "-var", "hostname=kx-main", "-var", "domain=kx-as-code.local", "-var", "version=0.8.16", "-var", "kube_version=1.27.4-00", "-var", "vm_user=kx.hero", "-var", "vm_password=L3arnandshare", "-var", "git_source_url=https://github.com/Accenture/kx.as.code.git", "-var", "git_source_branch=main", "-var", "git_source_user=", "-var", "git_source_token=", "-var", "base_image_ssh_user=vagrant", "./kx-main-local-profiles.json")
+	cmd := exec.Command("./tools/"+bin, "build", "-force", "-on-error="+*cleanup, "-only", *kxNodeType, "-var", "compute_engine_build=false", "-var", "memory="+*kxMemory, "-var", "cpus="+*kxCPUs, "-var", "video_memory=128", "-var", "hostname="+*kxHostname, "-var", "domain="+*kxDomain, "-var", "version="+*kxVersion, "-var", "kube_version=1.27.4-00", "-var", "vm_user="+*vmUser, "-var", "vm_password="+*vmPassword, "-var", "git_source_url=https://github.com/Accenture/kx.as.code.git", "-var", "git_source_branch=main", "-var", "git_source_user=", "-var", "git_source_token=", "-var", "base_image_ssh_user=vagrant", "./kx-main-local-profiles.json")
 	stdout, err := cmd.StdoutPipe()
 	simpleCheck(err)
 	stderr, err := cmd.StderrPipe()
