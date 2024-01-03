@@ -43,9 +43,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stdout, f), nil))
 	slog.SetDefault(logger)
 
-	// Could be replaced by runtime checks
-	l, _ := platform.Packer()
-	go fetch(l)
+	go findPacker()
 
 	// Parse templates during server startup
 	indexTpl, err := template.ParseFS(content, "templates/index.html", "templates/header.html")
@@ -100,7 +98,7 @@ func submitHandler(tpl *template.Template) http.HandlerFunc {
 			slog.Error("Templating error", "err", err)
 		}
 		slog.Info("Launching Packer.")
-		_, bin := platform.Packer()
+		_, bin := platform.Packer() // TODO: Use existing binary, if existing
 		err = execPacker(bin)
 		if err != nil {
 			slog.Error("Packer failed to launch.", "err", err)
@@ -108,44 +106,83 @@ func submitHandler(tpl *template.Template) http.HandlerFunc {
 	}
 }
 
-func fetch(url string) {
-	slog.Info("Downloading Packer.")
-	const file = "packer.zip"
+func findPacker() {
+	_, err := exec.LookPath("packer")
+	if err != nil {
+		slog.Info("Couldn't find packer", "err", err)
 
-	resp, err := http.Get(url)
-	simpleCheck(err)
-	defer resp.Body.Close()
+		l, _ := platform.Packer()
+		const dst = "packer.zip"
 
-	out, err := os.Create(file)
-	simpleCheck(err)
-	defer out.Close()
-
-	io.Copy(out, resp.Body)
-	unzip(file, "tools")
+		slog.Info("Fetching from remote", "url", l)
+		if err := fetch(l, dst); err != nil {
+			slog.Error("Could not fetch", "url", l, "err", err)
+			// TODO: Offer manual input as alternative
+			os.Exit(1)
+		}
+		if err := unzip(dst, "tools"); err != nil {
+			slog.Error("Could not unzip"+dst, "err", err)
+			os.Exit(1)
+		}
+	}
 }
 
-func unzip(file string, out string) {
+func fetch(url string, dst string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return err
+	}
+	return nil
+}
+
+func unzip(file string, out string) error {
 	slog.Info("Unpacking Packer.")
 	reader, err := zip.OpenReader(file)
-	simpleCheck(err)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
 	defer reader.Close()
 
 	for _, file := range reader.File {
 		src, err := file.Open()
-		simpleCheck(err)
+		if err != nil {
+			slog.Error("OS error", "err", err)
+			return err
+		}
 		defer src.Close()
 
 		relname := path.Join(out, file.Name)
 		dir := path.Dir(relname)
 		os.MkdirAll(dir, 0o777)
 		dst, err := os.Create(relname)
-		simpleCheck(err)
+		if err != nil {
+			slog.Error("OS error", "err", err)
+			return err
+		}
 		defer dst.Close()
 		io.Copy(dst, src)
 
 		err = os.Chmod(dst.Name(), 0o755)
-		simpleCheck(err)
+		if err != nil {
+			slog.Error("OS error", "err", err)
+			return err
+		}
 	}
+	return nil
 }
 
 func execPacker(bin string) error {
@@ -153,31 +190,33 @@ func execPacker(bin string) error {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	cmd := exec.Command("./tools/"+bin, "build", "-force", "-on-error="+*cleanup, "-only", *kxNodeType, "-var", "compute_engine_build=false", "-var", "memory="+*kxMemory, "-var", "cpus="+*kxCPUs, "-var", "video_memory=128", "-var", "hostname="+*kxHostname, "-var", "domain="+*kxDomain, "-var", "version="+*kxVersion, "-var", "kube_version=1.27.4-00", "-var", "vm_user="+*vmUser, "-var", "vm_password="+*vmPassword, "-var", "git_source_url=https://github.com/Accenture/kx.as.code.git", "-var", "git_source_branch=main", "-var", "git_source_user=", "-var", "git_source_token=", "-var", "base_image_ssh_user=vagrant", "./kx-main-local-profiles.json")
 	stdout, err := cmd.StdoutPipe()
-	simpleCheck(err)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
 	stderr, err := cmd.StderrPipe()
-	simpleCheck(err)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
 	err = cmd.Start()
 	if err != nil {
 		return errors.New(err.Error())
 	}
-	defer cmd.Start()
+	childLog, err := os.OpenFile("packer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
+	if err != nil {
+		slog.Error("OS error", "err", err)
+		return err
+	}
+
 	go func() {
 		<-sig
 		slog.Info("Terminating Packer")
 		platform.Terminate(cmd)
 		os.Exit(127)
 	}()
-	childLog, err := os.OpenFile("packer.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o666)
-	simpleCheck(err)
 	// copy packer output to terminal and log file
 	go io.Copy(io.MultiWriter(os.Stdout, childLog), stdout)
 	go io.Copy(io.MultiWriter(os.Stderr, childLog), stderr)
 	return nil
-}
-
-func simpleCheck(err error) {
-	if err != nil {
-		slog.Error("OS error", "err", err)
-		return
-	}
 }
